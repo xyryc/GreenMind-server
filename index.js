@@ -51,6 +51,7 @@ async function run() {
   try {
     const db = client.db("plantNetDB");
     const usersCollection = db.collection("users");
+    const plantsCollection = db.collection("plants");
 
     // save or update a user in db
     app.post("/users/:email", async (req, res) => {
@@ -86,6 +87,7 @@ async function run() {
         })
         .send({ success: true });
     });
+
     // Logout
     app.get("/logout", async (req, res) => {
       try {
@@ -99,6 +101,13 @@ async function run() {
       } catch (err) {
         res.status(500).send(err);
       }
+    });
+
+    // save a plant data in db
+    app.post("/plants", verifyToken, async (req, res) => {
+      const plant = req.body;
+      const result = await plantsCollection.insertOne(plant);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
