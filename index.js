@@ -36,7 +36,7 @@ const verifyToken = async (req, res, next) => {
   });
 };
 
-const uri = `mongodb://localhost:27017/`
+const uri = `mongodb://localhost:27017/`;
 // const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.t08r2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -49,6 +49,29 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
+    const db = client.db("plantNetDB");
+    const usersCollection = db.collection("users");
+
+    // save or update a user in db
+    app.post("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = req.body;
+
+      // check if user exists in db
+      const isExist = await usersCollection.findOne(query);
+      if (isExist) {
+        return res.send(isExist);
+      }
+
+      const result = await usersCollection.insertOne({
+        ...user,
+        role: "customer",
+        timestamp: Date.now(),
+      });
+      res.send(result);
+    });
+
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
