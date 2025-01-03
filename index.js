@@ -126,14 +126,23 @@ async function run() {
     });
 
     // save order data in db
-    app.post("/orders", async (req, res) => {
+    app.post("/orders", verifyToken, async (req, res) => {
       const orderInfo = req.body;
       const result = await ordersCollection.insertOne(orderInfo);
       res.send(result);
     });
 
     // manage plant quantity
-    
+    app.patch("/plants/quantity/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const { quantityToUpdate } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      let updatedDoc = {
+        $inc: { quantity: -quantityToUpdate },
+      };
+      const result = await plantsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
