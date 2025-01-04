@@ -144,6 +144,53 @@ async function run() {
       res.send(result);
     });
 
+    // get all orders for a specific customer
+    app.get("/customer-orders/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { "customer.email": email };
+
+      const result = await ordersCollection
+        .aggregate([
+          {
+            $match: query, // match by email in orders collection
+          },
+          {
+            $addFields: {
+              plantId: { $toObjectId: "$plantId" }, // convert plantId string field of orders collection in ObjectId
+            },
+          },
+          {
+            $lookup: {
+              // go to different collection and look for data
+              from: "plants", // collection name
+              localField: "plantId", //local data u want to match from orders collection
+              foreignField: "_id", // foreign data u want to compare, in this case in plant collection
+              as: "plants", // return the matched data as "plants" array
+            },
+          },
+          {
+            $unwind: "$plants", // return the "plants" array as object property, not array
+          },
+          {
+            $addFields: {
+              // only get the fields from "plants" array and add to the object property
+              name: "$plants.name",
+              category: "$plants.category",
+              image: "$plants.image",
+            },
+          },
+          {
+            // remove the "plants" object property from order object
+            $project: {
+              plants: 0,
+            },
+          },
+        ])
+        .toArray();
+
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
