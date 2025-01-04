@@ -74,6 +74,28 @@ async function run() {
       res.send(result);
     });
 
+    // manage user status and role
+    app.patch("/users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user?.status === "Requested")
+        return res
+          .status(400)
+          .send(
+            "You have already requested to become a seller, Wait for the admin to accept the request."
+          );
+
+      const updatedDoc = {
+        $set: {
+          status: "Requested",
+        },
+      };
+
+      const result = await usersCollection.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
@@ -135,11 +157,17 @@ async function run() {
     // manage plant quantity
     app.patch("/plants/quantity/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
-      const { quantityToUpdate } = req.body;
+      const { quantityToUpdate, status } = req.body;
       const filter = { _id: new ObjectId(id) };
       let updatedDoc = {
         $inc: { quantity: -quantityToUpdate },
       };
+      if (status === "increase") {
+        updatedDoc = {
+          $inc: { quantity: quantityToUpdate },
+        };
+      }
+
       const result = await plantsCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
@@ -196,7 +224,7 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const order = await ordersCollection.findOne(query);
-      if (order.status === "delivered")
+      if (order.status === "Delivered")
         return res
           .status(409)
           .send("Can't cancel once the product is delivered!");
