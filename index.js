@@ -96,6 +96,31 @@ async function run() {
       res.send(result);
     });
 
+    // get all user data
+    app.get("/all-users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: { $ne: email } };
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // update a user role and status
+    app.patch("/user/role/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+
+      const filer = { email };
+      const updatedDoc = {
+        $set: {
+          role: req.body.role,
+          status: req.body.status,
+        },
+      };
+
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // get user role
     app.get("/users/role/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email };
