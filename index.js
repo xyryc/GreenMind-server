@@ -275,6 +275,13 @@ async function run() {
       res.send(result);
     });
 
+    app.delete("/plants/:id", verifyToken, verifySeller, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await plantsCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // ** admin **
     // get all user data
     app.get("/all-users/:email", verifyToken, verifyAdmin, async (req, res) => {
