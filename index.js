@@ -18,7 +18,7 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
-// app.use(morgan("dev"));
+app.use(morgan("dev"));
 
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
@@ -279,6 +279,72 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await plantsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // get all orders for a specific seller
+    app.get(
+      "/seller-orders/:email",
+      verifyToken,
+      verifySeller,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { seller: email };
+
+        const result = await ordersCollection
+          .aggregate([
+            {
+              $match: query, // match by email in orders collection
+            },
+            {
+              $addFields: {
+                plantId: { $toObjectId: "$plantId" }, // convert plantId string field of orders collection in ObjectId
+              },
+            },
+            {
+              $lookup: {
+                // go to different collection and look for data
+                from: "plants", // collection name
+                localField: "plantId", //local data u want to match from orders collection
+                foreignField: "_id", // foreign data u want to compare, in this case in plant collection
+                as: "plants", // return the matched data as "plants" array
+              },
+            },
+            {
+              $unwind: "$plants", // return the "plants" array as object property, not array
+            },
+            {
+              $addFields: {
+                // only get the fields from "plants" array and add to the object property
+                name: "$plants.name",
+              },
+            },
+            {
+              // remove the "plants" object property from order object
+              $project: {
+                plants: 0,
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(result);
+      }
+    );
+
+    // update a order status
+    app.patch("/orders/:id", verifyToken, verifySeller, async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+
+      const updatedDoc = {
+        $set: {
+          status,
+        },
+      };
+
+      const result = await ordersCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
