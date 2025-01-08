@@ -18,7 +18,7 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(morgan("dev"));
+// app.use(morgan("dev"));
 
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
@@ -32,6 +32,7 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).send({ message: "unauthorized access" });
     }
     req.user = decoded;
+
     next();
   });
 };
@@ -56,92 +57,27 @@ async function run() {
 
     // verify admin middleware
     const verifyAdmin = async (req, res, next) => {
-      console.log("verify admin", req.user);
-
       const email = req.user?.email;
       const query = { email };
       const result = await usersCollection.findOne(query);
       if (!result || result?.role !== "admin") {
         return res.status(403).send({ message: "Forbidden access!" });
       }
-
       next();
     };
 
-    // save or update a user in db
-    app.post("/users/:email", async (req, res) => {
-      const email = req.params.email;
-      const query = { email };
-      const user = req.body;
-
-      // check if user exists in db
-      const isExist = await usersCollection.findOne(query);
-      if (isExist) {
-        return res.send(isExist);
-      }
-
-      const result = await usersCollection.insertOne({
-        ...user,
-        role: "customer",
-        timestamp: Date.now(),
-      });
-      res.send(result);
-    });
-
-    // manage user status and role
-    app.patch("/users/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const query = { email };
-      const user = await usersCollection.findOne(query);
-      if (!user || user?.status === "Requested")
-        return res
-          .status(400)
-          .send(
-            "You have already requested to become a seller, Wait for the admin to accept the request."
-          );
-
-      const updatedDoc = {
-        $set: {
-          status: "Requested",
-        },
-      };
-
-      const result = await usersCollection.updateOne(query, updatedDoc);
-      res.send(result);
-    });
-
-    // get all user data
-    app.get("/all-users/:email", verifyToken, verifyAdmin, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: { $ne: email } };
-      const result = await usersCollection.find(query).toArray();
-      res.send(result);
-    });
-
-    // update a user role and status
-    app.patch("/user/role/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const filter = { email };
-
-      const updatedDoc = {
-        $set: {
-          role: req.body.role,
-          status: "Verified",
-        },
-      };
-
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
-
-    // get user role
-    app.get("/users/role/:email", async (req, res) => {
-      const email = req.params.email;
+    // verify seller middleware
+    const verifySeller = async (req, res, next) => {
+      const email = req.user?.email;
       const query = { email };
       const result = await usersCollection.findOne(query);
-      res.send({ role: result?.role });
-    });
+      if (!result || result?.role !== "seller") {
+        return res.status(403).send({ message: "Forbidden access!" });
+      }
+      next();
+    };
 
+    // ** public **
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
@@ -172,13 +108,6 @@ async function run() {
       }
     });
 
-    // save a plant data in db
-    app.post("/plants", verifyToken, async (req, res) => {
-      const plant = req.body;
-      const result = await plantsCollection.insertOne(plant);
-      res.send(result);
-    });
-
     // get all plants from db
     app.get("/plants", async (req, res) => {
       const result = await plantsCollection.find().toArray();
@@ -197,24 +126,6 @@ async function run() {
     app.post("/orders", verifyToken, async (req, res) => {
       const orderInfo = req.body;
       const result = await ordersCollection.insertOne(orderInfo);
-      res.send(result);
-    });
-
-    // manage plant quantity
-    app.patch("/plants/quantity/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const { quantityToUpdate, status } = req.body;
-      const filter = { _id: new ObjectId(id) };
-      let updatedDoc = {
-        $inc: { quantity: -quantityToUpdate },
-      };
-      if (status === "increase") {
-        updatedDoc = {
-          $inc: { quantity: quantityToUpdate },
-        };
-      }
-
-      const result = await plantsCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
@@ -277,6 +188,122 @@ async function run() {
       const result = ordersCollection.deleteOne(query);
       res.send(result);
     });
+
+    // manage plant quantity/ +/- product count on cancel or order
+    app.patch("/plants/quantity/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const { quantityToUpdate, status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      let updatedDoc = {
+        $inc: { quantity: -quantityToUpdate },
+      };
+      if (status === "increase") {
+        updatedDoc = {
+          $inc: { quantity: quantityToUpdate },
+        };
+      }
+
+      const result = await plantsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // save or update a user in db
+    app.post("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = req.body;
+
+      // check if user exists in db
+      const isExist = await usersCollection.findOne(query);
+      if (isExist) {
+        return res.send(isExist);
+      }
+
+      const result = await usersCollection.insertOne({
+        ...user,
+        role: "customer",
+        timestamp: Date.now(),
+      });
+      res.send(result);
+    });
+
+    //  request to become a seller/ manage user status and role
+    app.patch("/users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user?.status === "Requested")
+        return res
+          .status(400)
+          .send(
+            "You have already requested to become a seller, Wait for the admin to accept the request."
+          );
+
+      const updatedDoc = {
+        $set: {
+          status: "Requested",
+        },
+      };
+
+      const result = await usersCollection.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+
+    // get user role
+    app.get("/users/role/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const result = await usersCollection.findOne(query);
+      res.send({ role: result?.role });
+    });
+
+    // ** seller **
+    // save a plant data in db
+    app.post("/plants", verifyToken, verifySeller, async (req, res) => {
+      const plant = req.body;
+      const result = await plantsCollection.insertOne(plant);
+      res.send(result);
+    });
+
+    // get inventory data for seller
+    app.get("/seller-plants", verifyToken, verifySeller, async (req, res) => {
+      const email = req?.user?.email;
+
+      const result = await plantsCollection
+        .find({ "seller.email": email })
+        .toArray();
+      res.send(result);
+    });
+
+    // ** admin **
+    // get all user data
+    app.get("/all-users/:email", verifyToken, verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: { $ne: email } };
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // update a user role and status
+    app.patch(
+      "/user/role/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const filter = { email };
+
+        const updatedDoc = {
+          $set: {
+            role: req.body.role,
+            status: "Verified",
+          },
+        };
+
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
