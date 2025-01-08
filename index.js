@@ -5,9 +5,11 @@ const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const morgan = require("morgan");
+const nodemailer = require("nodemailer");
 
 const port = process.env.PORT || 9000;
 const app = express();
+
 // middleware
 const corsOptions = {
   origin: ["http://localhost:5173", "http://localhost:5174"],
@@ -34,6 +36,66 @@ const verifyToken = async (req, res, next) => {
     req.user = decoded;
 
     next();
+  });
+};
+
+// send email using nodemailer
+const sendEmail = (emailAddress, emailData) => {
+  // const emailData = {
+  //   subject: "This is very important subject",
+  //   message: "Nice Message.",
+  // };
+
+  // create transporter
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // true for port 465, false for other ports
+    auth: {
+      user: process.env.NODEMAILER_USER,
+      pass: process.env.NODEMAILER_PASS,
+    },
+  });
+
+  // verify connection
+  transporter.verify((error, success) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Transporter is ready to send email", success);
+    }
+  });
+
+  // mail body
+  const mailBody = {
+    from: process.env.NODEMAILER_USER, // sender address
+    to: emailAddress, // list of receivers
+    subject: emailData?.subject, // Subject line
+
+    html: `
+     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h1 style="color: #4CAF50;">Message from PlantNet</h1>
+        <p>Hi there,</p>
+        <p>${emailData?.message}</p>
+        <p>Feel free to explore our platform and let us know if you have any questions.</p>
+        <p>Best regards,</p>
+        <p><strong>PlantNet Inc, Bangladesh</strong></p>
+        <footer style="margin-top: 20px; font-size: 12px; color: #777;">
+          <p>This email was sent by PlantNet.</p>
+          <p>34 Red Street, Dinajpur City 5200, Bangladesh</p>
+        </footer>
+      </div>
+      `, // html body
+  };
+
+  // send email
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log(info);
+      console.log("Email sent:", +info?.response);
+    }
   });
 };
 
@@ -126,6 +188,22 @@ async function run() {
     app.post("/orders", verifyToken, async (req, res) => {
       const orderInfo = req.body;
       const result = await ordersCollection.insertOne(orderInfo);
+
+      // send email on successful order
+      if (result.insertedId) {
+        // to customer
+        sendEmail(orderInfo?.customer?.email, {
+          subject: "Order Successful",
+          message: `You've placed an order successfully. Transaction Id: ${result?.insertedId}`,
+        });
+
+        // to seller
+        sendEmail(orderInfo?.seller, {
+          subject: "Hurray!, You've an order to process",
+          message: `Get the plants ready for ${orderInfo?.customer?.name}`,
+        });
+      }
+
       res.send(result);
     });
 
