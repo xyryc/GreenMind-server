@@ -93,7 +93,7 @@ const sendEmail = (emailAddress, emailData) => {
     if (error) {
       console.log(error);
     } else {
-      console.log(info);
+      // console.log(info);
       console.log("Email sent:", +info?.response);
     }
   });
@@ -455,6 +455,16 @@ async function run() {
         res.send(result);
       }
     );
+
+    // admin stats
+    app.get("/admin-stat", verifyToken, verifyAdmin, async (req, res) => {
+      // get total user, total plants
+      // const totalUser = await usersCollection.countDocuments({role: "admin"});    //this method is used for filtering and counting
+      const totalUser = await usersCollection.estimatedDocumentCount();
+      const totalPlants = await plantsCollection.estimatedDocumentCount();
+
+      res.send({ totalUser, totalPlants });
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
