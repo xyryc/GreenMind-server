@@ -177,6 +177,55 @@ async function run() {
       res.send(result);
     });
 
+    // get top 3 top selling plant
+    app.get("/top-selling-plants", async (req, res) => {
+      const result = await ordersCollection
+        .aggregate([
+          // Group orders by plantId and count total quantity sold
+          {
+            $group: {
+              _id: "$plantId",
+              totalSold: { $sum: "$quantity" }, // Sum up the quantity sold
+            },
+          },
+          // Sort by total quantity sold in descending order
+          { $sort: { totalSold: -1 } },
+          // Limit to top 3 best-selling plants
+          { $limit: 3 },
+          // covert _id to objectId
+          {
+            $addFields: {
+              plantIdObj: { $toObjectId: "$_id" }, // Convert plantId string to ObjectId
+            },
+          },
+          // Lookup plant details from plantsCollection
+          {
+            $lookup: {
+              from: "plants",
+              localField: "plantIdObj",
+              foreignField: "_id",
+              as: "plantDetails",
+            },
+          },
+          // Unwind the array to get a single object
+          { $unwind: "$plantDetails" },
+          // Project required fields
+          {
+            $project: {
+              _id: "$plantDetails._id",
+              name: "$plantDetails.name",
+              image: "$plantDetails.image",
+              category: "$plantDetails.category",
+              price: "$plantDetails.price",
+              totalSold: 1, // Include total sold count
+            },
+          },
+        ])
+        .toArray();
+
+      res.send(result);
+    });
+
     // get a plant by id
     app.get("/plants/:id", async (req, res) => {
       const id = req.params.id;
