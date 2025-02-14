@@ -13,7 +13,12 @@ const app = express();
 
 // middleware
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:5174"],
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://greenmind-ecommerce.web.app",
+    "https://greenmind-ecommerce.firebaseapp.com",
+  ],
   credentials: true,
   optionSuccessStatus: 200,
 };
@@ -100,8 +105,8 @@ const sendEmail = (emailAddress, emailData) => {
   });
 };
 
-const uri = `mongodb://localhost:27017/`;
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.t08r2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+// const uri = `mongodb://localhost:27017/`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.t08r2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -113,7 +118,7 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
-    const db = client.db("plantNetDB");
+    const db = client.db("greenmind");
     const usersCollection = db.collection("users");
     const plantsCollection = db.collection("plants");
     const ordersCollection = db.collection("orders");
