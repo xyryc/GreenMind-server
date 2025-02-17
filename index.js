@@ -623,9 +623,9 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("Hello from plantNet Server..");
+  res.send("Hello from GreenMind Server..");
 });
 
 app.listen(port, () => {
-  console.log(`plantNet is running on port ${port}`);
+  console.log(`GreenMind is running on port ${port}`);
 });
